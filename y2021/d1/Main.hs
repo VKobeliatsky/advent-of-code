@@ -11,10 +11,10 @@ import Data.Functor
 main :: IO ()
 main = do
     input :: [Int] <- Common.readGivenFile <&> (lines >>> map read)
-    print "task 1: "
-    print $ show $ increases input
-    print "task 2: "
-    print $ show $ slidingIncreases input
+    putStr "task 1: "
+    print (increases input)
+    putStr "task 2: "
+    print (slidingIncreases input)
 
 increases :: [Int] -> Int
 increases [] = 0
@@ -34,7 +34,7 @@ slidingIncreases :: [Int] -> Int
 slidingIncreases (n1:ns@(n2:n3:_)) = let
     go (a:rest@(b:c:_)) (!prevWindow, !count) = let
         nextWindow = a + b + c
-        in 
+        in
             go rest (nextWindow, if nextWindow > prevWindow then count + 1 else count)
     go _ a = a
     in
