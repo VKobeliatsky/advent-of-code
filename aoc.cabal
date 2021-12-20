@@ -42,6 +42,11 @@ executable y2021-d1
     main-is: Main.hs
     build-depends: common
 
+executable y2021-d2
+    import: deps
+    hs-source-dirs: y2021/d2
+    main-is: Main.hs
+    build-depends: common
 -- library
 --     exposed-modules:  MyLib
 
