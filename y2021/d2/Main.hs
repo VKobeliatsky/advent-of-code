@@ -1,9 +1,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE LambdaCase #-}
 module Main where
 
 import qualified Common
-import Control.Arrow ( (>>>) )
 import Data.Foldable (Foldable(foldl'))
 import Data.Functor ( (<&>) )
 
@@ -15,16 +13,17 @@ data Instruction
     deriving (Show)
 
 readInstruction :: String -> Instruction
-readInstruction = words >>> \case
+readInstruction input = case words input of
     ["forward", distance] -> Forward $ read distance
     ["up", distance] -> Up $ read distance
     ["down", distance] -> Down $ read distance
-    rest -> error $ "unrecognized Instruction: " ++ show rest
+    _ -> error $ "unrecognized Instruction: " ++ input
 
 
 data Position = Position
     { horizontal :: !Int
     , depth :: !Int
+    , aim :: !Int
     }
     deriving (Show)
 
@@ -35,6 +34,9 @@ main = do
     putStrLn "Task 1:"
     let destination = endPosition instructions
     print (horizontal destination * depth destination)
+    putStrLn "Task 2:"
+    let destination' = endPosition' instructions
+    print (horizontal destination' * depth destination')
 
 
 endPosition :: [Instruction] -> Position
@@ -44,4 +46,16 @@ endPosition = foldl'
         Up distance -> position {depth = depth position - distance}
         Down distance -> position {depth = depth position + distance}
     )
-    (Position 0 0)
+    (Position 0 0 0)
+
+endPosition' :: [Instruction] -> Position
+endPosition' = foldl'
+    (\position instruction -> case instruction of
+        Forward distance -> position {
+            horizontal = horizontal position + distance,
+            depth = depth position + distance * aim position
+        }
+        Up distance -> position { aim = aim position - distance }
+        Down distance -> position { aim = aim position + distance }
+    )
+    (Position 0 0 0)
