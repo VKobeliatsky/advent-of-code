@@ -1,0 +1,4 @@
+--failure-report .hspec-failures
+--rerun
+--rerun-all-on-success
+--color

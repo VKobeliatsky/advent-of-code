@@ -2,3 +2,4 @@
 dist-newstyle/
 **/input.data
 **/output.data
+.hspec-failures

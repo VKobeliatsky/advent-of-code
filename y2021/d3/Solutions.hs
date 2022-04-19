@@ -1,7 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-module Main where
+module Solutions where
 
 import Common
 import Control.Arrow
@@ -13,14 +13,12 @@ import Data.Functor
 import qualified Data.Vector as V
 
 
-main :: IO ()
-main = do
-    input <- readGivenFile
-    putStr "Task 1: "
-    print (computePowerRates input & uncurry (*))
-    putStr "Task 2: "
-    print (computeScrubberRates input & uncurry (*))
-    pure ()
+task1 :: String -> Int
+task1 = computePowerRates >>> uncurry (*)
+
+
+task2 :: String -> Int
+task2 = computeScrubberRates >>> uncurry (*)
 
 
 computePowerRates :: String -> (Int, Int)
