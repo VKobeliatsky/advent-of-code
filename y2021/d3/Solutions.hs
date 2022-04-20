@@ -7,11 +7,18 @@ module Solutions where
 import Common
 import Control.Arrow
 import Data.Bifunctor
-import Data.Foldable
+import Data.Foldable hiding (toList)
 import Data.Function
-import Data.Functor
 import Data.Maybe
-import qualified Data.Vector as V
+import Data.Vector hiding (filter, foldl', init, length, map, (++))
+import qualified Data.Vector as Vector
+
+type Row a = Vector a
+
+type Table a = Vector (Vector a)
+
+at :: Int -> Vector a -> a
+at = flip (!)
 
 task1 :: String -> Int
 task1 = computePowerRates >>> uncurry (*)
@@ -25,7 +32,7 @@ computePowerRates =
     >>> collectRates
     >>> bimap binToInt binToInt
 
-collectCounts :: String -> (Int, Int, [Int])
+collectCounts :: String -> (Int, [Int])
 collectCounts =
   foldl'
     ( \(!col, !row, !counts) -> \case
@@ -34,10 +41,11 @@ collectCounts =
         '\n' -> (0, row + 1, counts)
         c -> error $ "unexpected input: " ++ [c]
     )
-    (0, 1, [])
+    (0, 0, [])
+    >>> \(_, rows, counts) -> (rows, counts)
 
-collectRates :: (Int, Int, [Int]) -> (String, String)
-collectRates (_, rows, counts) =
+collectRates :: (Int, [Int]) -> (String, String)
+collectRates (rows, counts) =
   foldl'
     ( \(!gamma, !epsilon) !count ->
         if count > rows `div` 2
@@ -49,52 +57,37 @@ collectRates (_, rows, counts) =
 
 computeScrubberRates :: String -> (Int, Int)
 computeScrubberRates =
-  collectRecords
-    >>> recordsTable
-    >>> (\table -> (table, table))
-    >>> bimap
-      (findO2Rating >>> V.toList >>> binToInt)
-      (findCO2Rating >>> V.toList >>> binToInt)
+  tableFromString
+    >>> ( \table ->
+            ( table & findO2Rating & binToInt,
+              table & findCO2Rating & binToInt
+            )
+        )
 
-collectRecords :: String -> ([String], Int, Int)
-collectRecords =
-  foldl'
-    ( \(records, cols, rows) -> \case
-        '\n' -> ([] : records, cols, rows + 1)
-        c -> case records of
-          (curr : rest) -> ((curr ++ [c]) : rest, max (length curr + 1) cols, rows)
-          rest -> ([c] : rest, max 1 cols, rows)
-    )
-    ([], 0, 0)
-    . init
-
-recordsTable :: ([String], Int, Int) -> Table Char
-recordsTable (records, cols, rows) =
-  records
-    <&> padRight cols '0'
-    <&> V.fromListN cols
-    & V.fromListN rows
+tableFromString :: String -> Table Char
+tableFromString = lines >>> map fromList >>> fromList
 
 findO2Rating :: Table Char -> Row Char
 findO2Rating = go 0
   where
     go colIx table
-      | V.length table == 1 = table V.! 0
+      | Vector.length table == 1 = table ! 0
       | otherwise =
-        let (rows0, rows1) = V.partition (at colIx >>> (==) '0') table
+        let (rows0, rows1) = partition (at colIx >>> (==) '0') table
          in go (colIx + 1) $
-              if V.length rows0 > V.length rows1
+              if Vector.length rows0 > Vector.length rows1
                 then rows0
                 else rows1
 
 findCO2Rating :: Table Char -> Row Char
 findCO2Rating = go 0
   where
-    go colIx table
-      | V.length table == 1 = table V.! 0
+    go colIx rows
+      | Vector.length rows == 0 = Vector.empty
+      | Vector.length rows == 1 = rows ! 0
       | otherwise =
-        let (rows0, rows1) = V.partition (at colIx >>> (==) '0') table
+        let (rows0, rows1) = partition (at colIx >>> (==) '0') rows
          in go (colIx + 1) $
-              if V.length rows0 <= V.length rows1
+              if Vector.length rows0 <= Vector.length rows1
                 then rows0
                 else rows1
