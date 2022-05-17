@@ -23,25 +23,37 @@ extra-source-files: CHANGELOG.md
 
 common deps
   build-depends:
-    , base    ^>=4.14.3.0
+    , base        ^>=4.14.3.0
+    , containers
+    , mtl
+    , parsec
     , vector
 
   ghc-options:
     -Wall -Wcompat -Wincomplete-record-updates
     -Wincomplete-uni-patterns -Wredundant-constraints
+    -Wno-unused-do-bind -Wno-type-defaults
 
   default-language: Haskell2010
 
 common test-deps
-  import:        deps
+  import:             deps
   build-depends:
     , common
     , hspec
+
+  build-tool-depends: hspec-discover:hspec-discover -any
 
 library common
   import:          deps
   hs-source-dirs:  common
   exposed-modules: Common
+
+test-suite common-test
+  import:         test-deps
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: common/tests
+  main-is:        MainSpec.hs
 
 executable y2021-d1
   import:         deps
@@ -68,29 +80,19 @@ test-suite y2021-d3-test
   main-is:        MainSpec.hs
   build-depends:  y2021-d3
 
--- library
---     exposed-modules:  MyLib
+library y2021-d4
+  import:          deps
+  hs-source-dirs:  y2021/d4
+  exposed-modules:
+    Model
+    Parser
+    Solutions
 
---     -- Modules included in this library but not exported.
---     -- other-modules:
+  build-depends:   common
 
---     -- LANGUAGE extensions used by modules in this package.
---     -- other-extensions:
---     build-depends:    base ^>=4.14.3.0
---     hs-source-dirs:   src
---     default-language: Haskell2010
-
--- executable aoc
---     main-is:          Main.hs
-
---     -- Modules included in this executable, other than Main.
---     -- other-modules:
-
---     -- LANGUAGE extensions used by modules in this package.
---     -- other-extensions:
---     build-depends:
---         base ^>=4.14.3.0,
---         aoc
-
---     hs-source-dirs:   app
---     default-language: Haskell2010
+test-suite y2021-d4-test
+  import:         test-deps
+  type:           exitcode-stdio-1.0
+  hs-source-dirs: y2021/d4/tests
+  main-is:        Spec.hs
+  build-depends:  y2021-d4
