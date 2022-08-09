@@ -14,8 +14,11 @@ import Data.Foldable
 import Data.Functor
 import Data.IORef
 import Data.STRef
+import Data.Sequence (Seq, (|>))
+import qualified Data.Sequence as Seq
 import Data.Vector (Vector, (!))
 import qualified Data.Vector as Vector
+import qualified Data.Vector.Mutable as MVector
 import System.Environment
 import Text.Parsec
 
@@ -40,6 +43,9 @@ binToInt =
       )
       (0, 0 :: Int)
 
+maybeToRight :: b -> Maybe a -> Either b a
+maybeToRight b = maybe (Left b) Right
+
 eol :: Stream input monad Char => ParsecT input state monad Char
 eol = char '\n'
 
@@ -51,17 +57,59 @@ spacesOnly = many spaceOnly
 
 type Table a = Vector (Vector a)
 
+selectElements :: Table a -> [a]
+selectElements = tableFoldl' (|>) Seq.empty >>> toList
+
+tableFoldl' :: (b -> a -> b) -> b -> Table a -> b
+tableFoldl' f = foldl' (foldl' f)
+
+tableFoldr' :: (a -> b -> b) -> b -> Table a -> b
+tableFoldr' f = foldr' (flip (foldr' f))
+
+tableCol :: Int -> Table a -> [a]
+tableCol colIx = foldl' (\col row -> col |> row Vector.! colIx) Seq.empty >>> toList
+
+tableRow :: Int -> Table a -> [a]
+tableRow rowIx = flip (Vector.!) rowIx >>> toList
+
+tableMap :: (a -> b) -> Table a -> Table b
+tableMap f = Vector.map (Vector.map f)
+
+tableFor :: Table a -> (a -> b) -> Table b
+tableFor = flip tableMap
+
+tableIMap :: ((Int, Int) -> a -> b) -> Table a -> Table b
+tableIMap f = Vector.imap (\rowIx -> Vector.imap (\colIx -> f (rowIx, colIx)))
+
+tableIFor :: Table a -> ((Int, Int) -> a -> b) -> Table b
+tableIFor = flip tableIMap
+
+tableMapM :: Monad m => (a -> m b) -> Table a -> m (Table b)
+tableMapM f = Vector.mapM (Vector.mapM f)
+
+tableForM :: Monad m => Table a -> (a -> m b) -> m (Table b)
+tableForM = flip tableMapM
+
+tableIMapM :: Monad m => ((Int, Int) -> a -> m b) -> Table a -> m (Table b)
+tableIMapM f = Vector.imapM (\rowIx -> Vector.imapM (\colIx -> f (rowIx, colIx)))
+
+tableIForM :: Monad m => Table a -> ((Int, Int) -> a -> m b) -> m (Table b)
+tableIForM = flip tableIMapM
+
+tableMapM_ :: Monad m => (a -> m b) -> Table a -> m ()
+tableMapM_ f = Vector.mapM_ (Vector.mapM_ f)
+
+tableForM_ :: Monad m => Table a -> (a -> m b) -> m ()
+tableForM_ = flip tableMapM_
+
+tableIMapM_ :: Monad m => ((Int, Int) -> a -> m b) -> Table a -> m ()
+tableIMapM_ f = Vector.imapM_ (\rowIx -> Vector.imapM_ (\colIx -> f (rowIx, colIx)))
+
+tableIForM_ :: Monad m => Table a -> ((Int, Int) -> a -> m b) -> m ()
+tableIForM_ = flip tableIMapM_
+
 tableFromLists :: [[a]] -> Table a
 tableFromLists = map Vector.fromList >>> Vector.fromList
-
-selectRow :: Int -> Table a -> Vector a
-selectRow rowIx board = board ! rowIx
-
-selectCol :: Int -> Table a -> [a]
-selectCol colIx board =
-  [ board ! rowIx ! colIx
-    | rowIx <- [0 .. Vector.length board - 1]
-  ]
 
 class Monad monad => RefMonad monad ref | monad -> ref where
   newRef :: a -> monad (ref a)
@@ -89,12 +137,11 @@ instance RefMonad (ParsecT i u (ST s)) (STRef s) where
   readRef = lift . readRef
   writeRef ref val = lift $ writeRef ref val
 
-parser :: ParsecT String (STRef s String) (ST s) (STRef s String)
-parser = do
-  str <- string "state"
-  ref <- getState
-  writeRef ref str
-  return ref
-
--- >>> runST $ newSTRef "" >>= \ref -> runParserT parser ref "" "state" >>= readSTRef . either (const undefined) id
--- "state"
+seqToVector :: Seq a -> Vector a
+seqToVector as =
+  Vector.create
+    ( do
+        v <- MVector.new $ Seq.length as
+        Seq.traverseWithIndex (MVector.write v) as
+        pure v
+    )

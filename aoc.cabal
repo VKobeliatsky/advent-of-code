@@ -84,7 +84,9 @@ library y2021-d4
   import:          deps
   hs-source-dirs:  y2021/d4
   exposed-modules:
-    Model
+    Model.Board
+    Model.Cell
+    Model.Game
     Parser
     Solutions
 
@@ -96,3 +98,6 @@ test-suite y2021-d4-test
   hs-source-dirs: y2021/d4/tests
   main-is:        Spec.hs
   build-depends:  y2021-d4
+  other-modules:
+    ModelSpec
+    ParserSpec

@@ -15,8 +15,6 @@ import qualified Data.Vector as Vector
 
 type Row a = Vector a
 
-type Table a = Vector (Vector a)
-
 at :: Int -> Vector a -> a
 at = flip (!)
 
