@@ -23,7 +23,7 @@ extra-source-files: CHANGELOG.md
 
 common deps
   build-depends:
-    , base        ^>=4.14.3.0
+    , base        ^>=4.17.2.0
     , containers
     , mtl
     , parsec
