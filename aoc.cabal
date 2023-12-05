@@ -24,6 +24,8 @@ extra-source-files: CHANGELOG.md
 common deps
   build-depends:
     , base        ^>=4.17.2.0
+    , text
+    , conduit
     , containers
     , mtl
     , parsec
@@ -101,3 +103,10 @@ test-suite y2021-d4-test
   other-modules:
     ModelSpec
     ParserSpec
+
+
+executable y2023-d1
+  import:         deps
+  hs-source-dirs: y2023/d1
+  main-is:        Main.hs
+  build-depends:  common

@@ -16,7 +16,9 @@ import Data.IORef
 import Data.STRef
 import Data.Sequence (Seq, (|>))
 import qualified Data.Sequence as Seq
-import Data.Vector (Vector, (!))
+import qualified Data.Text as T
+import qualified Data.Text.IO as T
+import Data.Vector (Vector)
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Mutable as MVector
 import System.Environment
@@ -27,12 +29,17 @@ readGivenFile = do
   fileName <- getArgs <&> head
   readFile fileName
 
+readGivenFileText :: IO T.Text
+readGivenFileText = do
+  fileName <- getArgs <&> head
+  T.readFile fileName
+
 updateAt :: Int -> (Maybe a -> a) -> [a] -> [a]
 updateAt n update xs = case splitAt n xs of
   (!as, []) -> as ++ [update Nothing]
   (!as, x : (!bs)) -> as ++ [update $ Just x] ++ bs
 
-binToInt :: Foldable m => m Char -> Int
+binToInt :: (Foldable m) => m Char -> Int
 binToInt =
   fst
     . foldr'
@@ -46,13 +53,13 @@ binToInt =
 maybeToRight :: b -> Maybe a -> Either b a
 maybeToRight b = maybe (Left b) Right
 
-eol :: Stream input monad Char => ParsecT input state monad Char
+eol :: (Stream input monad Char) => ParsecT input state monad Char
 eol = char '\n'
 
-spaceOnly :: Stream input monad Char => ParsecT input state monad Char
+spaceOnly :: (Stream input monad Char) => ParsecT input state monad Char
 spaceOnly = char ' '
 
-spacesOnly :: Stream input monad Char => ParsecT input state monad [Char]
+spacesOnly :: (Stream input monad Char) => ParsecT input state monad [Char]
 spacesOnly = many spaceOnly
 
 type Table a = Vector (Vector a)
@@ -84,34 +91,34 @@ tableIMap f = Vector.imap (\rowIx -> Vector.imap (\colIx -> f (rowIx, colIx)))
 tableIFor :: Table a -> ((Int, Int) -> a -> b) -> Table b
 tableIFor = flip tableIMap
 
-tableMapM :: Monad m => (a -> m b) -> Table a -> m (Table b)
+tableMapM :: (Monad m) => (a -> m b) -> Table a -> m (Table b)
 tableMapM f = Vector.mapM (Vector.mapM f)
 
-tableForM :: Monad m => Table a -> (a -> m b) -> m (Table b)
+tableForM :: (Monad m) => Table a -> (a -> m b) -> m (Table b)
 tableForM = flip tableMapM
 
-tableIMapM :: Monad m => ((Int, Int) -> a -> m b) -> Table a -> m (Table b)
+tableIMapM :: (Monad m) => ((Int, Int) -> a -> m b) -> Table a -> m (Table b)
 tableIMapM f = Vector.imapM (\rowIx -> Vector.imapM (\colIx -> f (rowIx, colIx)))
 
-tableIForM :: Monad m => Table a -> ((Int, Int) -> a -> m b) -> m (Table b)
+tableIForM :: (Monad m) => Table a -> ((Int, Int) -> a -> m b) -> m (Table b)
 tableIForM = flip tableIMapM
 
-tableMapM_ :: Monad m => (a -> m b) -> Table a -> m ()
+tableMapM_ :: (Monad m) => (a -> m b) -> Table a -> m ()
 tableMapM_ f = Vector.mapM_ (Vector.mapM_ f)
 
-tableForM_ :: Monad m => Table a -> (a -> m b) -> m ()
+tableForM_ :: (Monad m) => Table a -> (a -> m b) -> m ()
 tableForM_ = flip tableMapM_
 
-tableIMapM_ :: Monad m => ((Int, Int) -> a -> m b) -> Table a -> m ()
+tableIMapM_ :: (Monad m) => ((Int, Int) -> a -> m b) -> Table a -> m ()
 tableIMapM_ f = Vector.imapM_ (\rowIx -> Vector.imapM_ (\colIx -> f (rowIx, colIx)))
 
-tableIForM_ :: Monad m => Table a -> ((Int, Int) -> a -> m b) -> m ()
+tableIForM_ :: (Monad m) => Table a -> ((Int, Int) -> a -> m b) -> m ()
 tableIForM_ = flip tableIMapM_
 
 tableFromLists :: [[a]] -> Table a
 tableFromLists = map Vector.fromList >>> Vector.fromList
 
-class Monad monad => RefMonad monad ref | monad -> ref where
+class (Monad monad) => RefMonad monad ref | monad -> ref where
   newRef :: a -> monad (ref a)
   readRef :: ref a -> monad a
   writeRef :: ref a -> a -> monad ()
