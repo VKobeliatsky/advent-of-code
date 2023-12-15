@@ -1,5 +1,4 @@
 .vscode/
 dist-newstyle/
-**/input.data
-**/output.data
+**/*.data
 .hspec-failures
