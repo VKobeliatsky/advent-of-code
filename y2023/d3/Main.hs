@@ -24,21 +24,21 @@ main = do
   print $ task1 input
 
 task1 :: T.Text -> Int
-task1 input = runST $ do
-  ref <- newRef $ Number (0, False)
-  evalStateT
-    ( do
-        mapM_ processChar (T.unpack input)
-        state <- get
-        markedElements <- mapM readRef (marked state)
-        pure $ sum $ markedElements <&> mapNumber 0 fst
-    )
-    (TaskState V.empty (0, []) ref [])
+task1 input =
+  runST $
+    evalStateT
+      ( do
+          mapM_ processChar (T.unpack input)
+          state <- get
+          markedElements <- mapM readRef (marked state)
+          pure $ sum $ markedElements <&> mapNumber 0 fst
+      )
+      (TaskState V.empty (0, []) Nothing [])
 
 data TaskState m = TaskState
   { prevLine :: Vector (Ref m Element),
     currLine :: (Int, [Ref m Element]),
-    currNumber :: Ref m Element,
+    currNumber :: Maybe (Ref m Element),
     marked :: [Ref m Element]
   }
 
@@ -60,7 +60,9 @@ isNumber = mapNumber False (const True)
 
 processChar :: (RefMonad m) => Char -> StateT (TaskState m) m ()
 processChar currentChar = do
-  when (isEol currentChar) finalizeLine
+  when (isEol currentChar) $ do
+    finalizeCurrentNumber
+    finalizeLine
 
   when (isDot currentChar) $ do
     finalizeCurrentNumber
@@ -73,10 +75,12 @@ processChar currentChar = do
     putToLine ref
 
   when (isSymbol currentChar) $ do
-    finalizeCurrentNumber
+    prevNumber <- finalizeCurrentNumber
     markPrevLineNumbers
-    prevNumber <- getPrevNumber
-    mapM_ mark prevNumber
+    maybe
+      (pure ())
+      mark
+      prevNumber
     newRef Symbol >>= putToLine
   where
     isEol = (==) '\n'
@@ -102,14 +106,25 @@ processChar currentChar = do
       modify' (\s -> s {prevLine = vector, currLine = (0, [])})
 
     finalizeCurrentNumber = do
-      num <- gets currNumber >>= readRef
-      unless (num == Number (0, False)) $ do
-        newNumber <- newRef (Number (0, False))
-        modify' (\s -> s {currNumber = newNumber})
+      number <- gets currNumber
+      maybe
+        (pure ())
+        (const $ modify' (\s -> s {currNumber = Nothing}))
+        number
+      pure number
 
     updateCurrentNumber c = do
       let nextDigit = digitToInt c
-      ref <- gets currNumber
+      maybeRef <- gets currNumber
+      ref <-
+        maybe
+          ( do
+              newNumber <- newRef $ Number (0, False)
+              modify' (\s -> s {currNumber = Just newNumber})
+              pure newNumber
+          )
+          pure
+          maybeRef
       updateRef ref (mapNumber (error "Number expected") $ first ((*) 10 >>> (+) nextDigit) >>> Number)
       pure ref
 
@@ -125,17 +140,6 @@ processChar currentChar = do
       isRightTopSymbol <-
         maybe (pure False) (fmap (Symbol ==) . readRef) (row !? (V.length row - idx))
       pure $ isLeftSymbol || isLeftTopSymbol || isTopSymbol || isRightTopSymbol
-
-    getPrevNumber = do
-      prev <- gets $ (currLine >>> snd >>> L.uncons) <&> (<&> fst)
-      case prev of
-        Nothing -> pure Nothing
-        Just ref -> do
-          element <- readRef ref
-          pure $
-            if isNumber element
-              then Just ref
-              else Nothing
 
     markPrevLineNumbers = do
       idx <- gets currIndex
