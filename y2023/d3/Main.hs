@@ -35,17 +35,6 @@ task1 input = runST $ do
     )
     (TaskState V.empty (0, []) ref [])
 
-type Schematic = Vector (Vector Char)
-
-readSchematic :: T.Text -> Schematic
-readSchematic input =
-  let lists =
-        T.foldl'
-          (\(table, row) c -> if c == '\n' then (table ++ [row], []) else (table, row ++ [c]))
-          ([], [])
-          input
-   in V.fromList $ V.fromList <$> fst lists
-
 data TaskState m = TaskState
   { prevLine :: Vector (Ref m Element),
     currLine :: (Int, [Ref m Element]),
