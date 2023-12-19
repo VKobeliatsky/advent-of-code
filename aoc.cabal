@@ -116,3 +116,9 @@ executable y2023-d2
   hs-source-dirs: y2023/d2
   main-is:        Main.hs
   build-depends:  common
+
+executable y2023-d3
+  import:         deps
+  hs-source-dirs: y2023/d3
+  main-is:        Main.hs
+  build-depends:  common

@@ -28,10 +28,8 @@ task1 :: T.Text -> Int
 task1 input =
   let games = parse (parseGame `sepBy1` newline) "task1 input" input & either (error . show) id
       validGames = games & filter (\(_, cubesSets) -> all (all isValidGame) cubesSets)
-   in foldl'
-        (\acc (gameId, _) -> acc + gameId)
-        0
-        validGames
+      validGameIds = validGames <&> fst
+   in sum validGameIds
 
 data Bag = Bag
   { red :: Int,
@@ -101,5 +99,5 @@ task2 :: T.Text -> Int
 task2 input =
   let games = parse (parseGame `sepBy1` newline) "task1 input" input & either (error . show) id
       cubesSets = snd <$> games
-      viableCubes :: [Bag] = cubesSets <&> (concat >>> foldl' minViableBag emptyBag)
+      viableCubes = cubesSets <&> (concat >>> foldl' minViableBag emptyBag)
    in viableCubes <&> bagPower & sum

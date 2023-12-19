@@ -1,18 +1,20 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Common where
 
 import Control.Arrow
 import Control.Monad.ST
-import Control.Monad.Trans
+import Control.Monad.State (StateT)
+import Control.Monad.Trans (lift)
 import Data.Foldable
 import Data.Functor
 import Data.IORef
+import Data.Kind
 import Data.STRef
 import Data.Sequence (Seq, (|>))
 import qualified Data.Sequence as Seq
@@ -118,28 +120,38 @@ tableIForM_ = flip tableIMapM_
 tableFromLists :: [[a]] -> Table a
 tableFromLists = map Vector.fromList >>> Vector.fromList
 
-class (Monad monad) => RefMonad monad ref | monad -> ref where
-  newRef :: a -> monad (ref a)
-  readRef :: ref a -> monad a
-  writeRef :: ref a -> a -> monad ()
-  updateRef :: ref a -> (a -> a) -> monad a
+class (Monad monad) => RefMonad monad where
+  type Ref monad :: Type -> Type
+  newRef :: a -> monad (Ref monad a)
+  readRef :: Ref monad a -> monad a
+  writeRef :: Ref monad a -> a -> monad ()
+  updateRef :: Ref monad a -> (a -> a) -> monad a
   updateRef ref f = do
     x <- readRef ref
     let result = f x
     writeRef ref result
     pure result
 
-instance RefMonad IO IORef where
+instance RefMonad IO where
+  type Ref IO = IORef
   newRef = newIORef
   readRef = readIORef
   writeRef = writeIORef
 
-instance RefMonad (ST s) (STRef s) where
+instance RefMonad (ST s) where
+  type Ref (ST s) = STRef s
   newRef = newSTRef
   readRef = readSTRef
   writeRef = writeSTRef
 
-instance RefMonad (ParsecT i u (ST s)) (STRef s) where
+instance (RefMonad m) => RefMonad (StateT s m) where
+  type Ref (StateT s m) = Ref m
+  newRef = lift . newRef
+  readRef = lift . readRef
+  writeRef ref val = lift $ writeRef ref val
+
+instance RefMonad (ParsecT i u (ST s)) where
+  type Ref (ParsecT i u (ST s)) = STRef s
   newRef = lift . newRef
   readRef = lift . readRef
   writeRef ref val = lift $ writeRef ref val
