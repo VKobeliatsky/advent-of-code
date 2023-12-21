@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -65,7 +66,36 @@ spaceOnly = char ' '
 spacesOnly :: (Stream input monad Char) => ParsecT input state monad [Char]
 spacesOnly = many spaceOnly
 
+seqToVector :: Seq a -> Vector a
+seqToVector as =
+  Vector.create
+    ( do
+        v <- MVector.new $ Seq.length as
+        Seq.traverseWithIndex (MVector.write v) as
+        pure v
+    )
+
 type Table a = Vector (Vector a)
+
+tableRender :: (a -> String) -> Table a -> String
+tableRender renderTile =
+  Vector.foldl'
+    ( \tableView row ->
+        tableView
+          ++ Vector.foldl'
+            (\rowView a -> rowView ++ renderTile a ++ " ")
+            ""
+            row
+          ++ "\n"
+    )
+    ""
+
+type RefTable m a = Vector (Vector (Ref m a))
+
+serialize :: (RefMonad m) => RefTable m a -> m (Table a)
+serialize = tableMapM readRef
+
+type TableCoords = (Int, Int)
 
 selectElements :: Table a -> [a]
 selectElements = tableFoldl' (|>) Seq.empty >>> toList
@@ -164,12 +194,3 @@ instance (RefMonad m) => RefMonad (ParsecT i u m) where
   newRef = lift . newRef
   readRef = lift . readRef
   writeRef ref val = lift $ writeRef ref val
-
-seqToVector :: Seq a -> Vector a
-seqToVector as =
-  Vector.create
-    ( do
-        v <- MVector.new $ Seq.length as
-        Seq.traverseWithIndex (MVector.write v) as
-        pure v
-    )
