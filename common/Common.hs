@@ -15,12 +15,13 @@ import Data.Foldable
 import Data.Functor
 import Data.IORef
 import Data.Kind
+import Data.Maybe (maybeToList)
 import Data.STRef
 import Data.Sequence (Seq, (|>))
 import qualified Data.Sequence as Seq
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
-import Data.Vector (Vector)
+import Data.Vector (Vector, (!?))
 import qualified Data.Vector as Vector
 import qualified Data.Vector.Mutable as MVector
 import System.Environment
@@ -68,6 +69,14 @@ type Table a = Vector (Vector a)
 
 selectElements :: Table a -> [a]
 selectElements = tableFoldl' (|>) Seq.empty >>> toList
+
+selectNeighbors :: (Int, Int) -> Table a -> [a]
+selectNeighbors (i, j) table = do
+  let t = maybeToList (table !? (i - 1) >>= (!? j))
+  let r = maybeToList (table !? i >>= (!? (j + 1)))
+  let b = maybeToList (table !? (i + 1) >>= (!? j))
+  let l = maybeToList (table !? i >>= (!? (j - 1)))
+  t ++ r ++ b ++ l
 
 tableFoldl' :: (b -> a -> b) -> b -> Table a -> b
 tableFoldl' f = foldl' (foldl' f)
@@ -150,8 +159,8 @@ instance (RefMonad m) => RefMonad (StateT s m) where
   readRef = lift . readRef
   writeRef ref val = lift $ writeRef ref val
 
-instance RefMonad (ParsecT i u (ST s)) where
-  type Ref (ParsecT i u (ST s)) = STRef s
+instance (RefMonad m) => RefMonad (ParsecT i u m) where
+  type Ref (ParsecT i u m) = Ref m
   newRef = lift . newRef
   readRef = lift . readRef
   writeRef ref val = lift $ writeRef ref val
