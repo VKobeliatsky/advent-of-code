@@ -1,10 +1,8 @@
-{-# LANGUAGE TupleSections #-}
-
 module Main where
 
 import Common
-import Control.Arrow
 import Control.Monad
+import Control.Monad.State (StateT (..), execStateT, gets, modify')
 import qualified Data.Bifunctor as BF
 import Data.Foldable (foldlM)
 import Data.Functor
@@ -12,58 +10,82 @@ import qualified Data.List as L
 import qualified Data.Vector as V
 import Text.Parsec
 
+targetSteps :: Int
+targetSteps = 64
+
+isTargetEven :: Bool
+isTargetEven = even targetSteps
+
+shouldMark :: (Integral a) => a -> Bool
+shouldMark n = if isTargetEven then even n else odd n
+
 main :: IO ()
 main = do
   input <- readFile "y2023/d21/input.data"
-  (inputTable, starts) <- runParserT parseInputTable (0, 0) "" input <&> either (error . show) id
 
-  result <- go (0, inputTable, starts)
-  print $ "Task1: " ++ show result
-  where
-    targetSteps = 64
-    go (step, _, refs) | step == targetSteps = pure $ length refs
-    go state = processStep state >>= go
+  (inputTable, startRefs) <- runParserT parseInputTable (0, 0) "" input <&> either (error . show) id
 
-processStep :: (RefMonad m) => (Int, InputTable m, [Ref m Tile]) -> m (Int, InputTable m, [Ref m Tile])
-processStep (prevStep, table, starts) = do
-  let step = prevStep + 1
-  nextStarts <-
-    foldlM
-      ( \acc ref -> do
-          (_, coords) <- readRef ref <&> mapStartTile (error "Start expected") id
+  result <-
+    execStateT
+      (mapM processStep [1 .. targetSteps])
+      (TaskState inputTable startRefs (if isTargetEven then 1 else 0))
 
-          refs <-
-            filterM
-              ( \ref -> do
-                  tile <- readRef ref
-                  let isRock = isRockTile tile
-                  let isAccounted = mapStartTile False (fst >>> (==) step) tile
-                  pure (not isRock && not isAccounted)
-              )
-              (selectNeighbors coords table)
+  tableView <- serialize (table result) <&> tableRender renderTile
 
-          mapM_ (`updateRef` (Start . (step,) . getTileCoords)) refs
-          updateRef ref (Garden . getTileCoords)
+  putStrLn $
+    L.intercalate
+      "\n"
+      [ "Task 1:",
+        show targetSteps,
+        tableView,
+        show $ tilesCount result
+      ]
 
-          pure $ acc ++ refs
-      )
-      []
-      starts
-
-  pure (step, table, nextStarts)
+processStep :: (RefMonad m) => Int -> StateT (TaskState m) m ()
+processStep n =
+  let mark = shouldMark n
+   in gets unvisisted
+        >>= mapM_
+          ( \ref -> do
+              coords <- readRef ref <&> getCoords
+              inputTable <- gets table
+              selectNeighbors coords inputTable
+                `forM_` ( \neighborRef -> do
+                            tile <- readRef neighborRef
+                            let neighborCoords = getCoords tile
+                            let isRock = isRockTile tile
+                            let isVisited = isVisitedTile tile
+                            when (not isRock && not isVisited) $ do
+                              when mark incCount
+                              updateRef neighborRef $ const $ Visited neighborCoords n mark
+                              modify' $ \s -> s {unvisisted = neighborRef : unvisisted s}
+                              pure ()
+                        )
+          )
 
 type InputTable m = Table (Ref m Tile)
 
-data Tile
-  = Garden TableCoords
-  | Rock TableCoords
-  | Start (Int, TableCoords)
-  deriving (Eq)
+data TaskState m = TaskState
+  { table :: InputTable m,
+    unvisisted :: [Ref m Tile],
+    tilesCount :: Int
+  }
 
-instance Show Tile where
-  show (Garden coords) = ". " ++ show coords
-  show (Rock coords) = "# " ++ show coords
-  show (Start coords) = "S " ++ show coords
+data Tile
+  = Garden {getCoords :: TableCoords}
+  | Rock {getCoords :: TableCoords}
+  | Visited {getCoords :: TableCoords, getScore :: Int, isResult :: Bool}
+  deriving (Eq, Show)
+
+incCount :: (Monad m) => StateT (TaskState m) m ()
+incCount = modify' $ \s -> s {tilesCount = tilesCount s + 1}
+
+renderTile :: Tile -> String
+renderTile (Visited _ n b)
+  | n == 0 = " S "
+  | otherwise = L.concat $ if b then ["(", show n, ")"] else [" ", show n, " "]
+renderTile (Garden _) = " . "
+renderTile (Rock _) = " # "
 
 isGardenTile :: Tile -> Bool
 isGardenTile (Garden _) = True
@@ -73,22 +95,17 @@ isRockTile :: Tile -> Bool
 isRockTile (Rock _) = True
 isRockTile _ = False
 
-isStartTile :: Tile -> Bool
-isStartTile (Start _) = True
-isStartTile _ = False
+isVisitedTile :: Tile -> Bool
+isVisitedTile (Visited {}) = True
+isVisitedTile _ = False
 
-getTileCoords :: Tile -> TableCoords
-getTileCoords (Start (_, coords)) = coords
-getTileCoords (Garden coords) = coords
-getTileCoords (Rock coords) = coords
+mapVisitedTile :: a -> ((TableCoords, Int) -> a) -> Tile -> a
+mapVisitedTile _ f (Visited coords n _) = f (coords, n)
+mapVisitedTile def _ _ = def
 
-mapStartTile :: a -> ((Int, TableCoords) -> a) -> Tile -> a
-mapStartTile _ f (Start coords) = f coords
-mapStartTile def _ _ = def
-
-mapStartTileM :: m a -> ((Int, TableCoords) -> m a) -> Tile -> m a
-mapStartTileM _ f (Start coords) = f coords
-mapStartTileM def _ _ = def
+mapVisitedTileM :: m a -> ((TableCoords, Int) -> m a) -> Tile -> m a
+mapVisitedTileM _ f (Visited coords n _) = f (coords, n)
+mapVisitedTileM def _ _ = def
 
 parseInputTable :: (RefMonad m) => ParsecT String TableCoords m (InputTable m, [Ref m Tile])
 parseInputTable = do
@@ -106,7 +123,7 @@ parseRow = do
     foldlM
       ( \acc ref -> do
           tile <- readRef ref
-          if isStartTile tile
+          if isVisitedTile tile
             then pure (ref : acc)
             else pure acc
       )
@@ -121,6 +138,6 @@ parseTile = do
   tile <-
     char '.' $> Garden coords
       <|> char '#' $> Rock coords
-      <|> char 'S' $> Start (0, coords)
+      <|> char 'S' $> Visited coords 0 False
   updateState (BF.second (+ 1))
   newRef tile
