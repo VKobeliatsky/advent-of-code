@@ -49,7 +49,9 @@ common test-deps
 library common
   import:          deps
   hs-source-dirs:  common
-  exposed-modules: Common, Common.RefMonad
+  exposed-modules:  Common
+                  , Common.RefMonad
+                  , Common.Table
 
 test-suite common-test
   import:         test-deps
@@ -126,5 +128,11 @@ executable y2023-d3
 executable y2023-d21
   import:         deps
   hs-source-dirs: y2023/d21
+  main-is:        Main.hs
+  build-depends:  common
+
+executable y2023-d25
+  import:         deps
+  hs-source-dirs: y2023/d25
   main-is:        Main.hs
   build-depends:  common

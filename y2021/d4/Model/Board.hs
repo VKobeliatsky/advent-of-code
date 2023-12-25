@@ -2,16 +2,17 @@
 
 module Model.Board where
 
-import Common
-import Control.Arrow
-import Control.Monad
-import Control.Monad.ST
-import Data.Foldable
-import Data.Functor
+import           Common.RefMonad
+import           Common.Table
+import           Control.Arrow
+import           Control.Monad
+import           Control.Monad.ST
+import           Data.Foldable
+import           Data.Functor
 import qualified Data.List as List
-import Data.STRef
-import Model.Cell
-import Text.Printf
+import           Data.STRef
+import           Model.Cell
+import           Text.Printf
 
 type Board s a = Table (STRef s (BoardCell s a))
 
@@ -30,38 +31,37 @@ selectRow cell = do
 serializeSelection :: [STRef s (BoardCell s a)] -> ST s [SerializedBoardCell a]
 serializeSelection refs = mapM readRef refs <&> (<$>) serializeCell
 
-updateCell :: (Cell a -> Cell a) -> STRef s (BoardCell s a) -> ST s (BoardCell s a)
+updateCell
+  :: (Cell a -> Cell a) -> STRef s (BoardCell s a) -> ST s (BoardCell s a)
 updateCell f targetRef =
-  updateRef
-    targetRef
-    (\cell -> cell {boardCell = f $ boardCell cell})
+  updateRef targetRef (\cell -> cell { boardCell = f $ boardCell cell })
 
 type BingoBoard s = Board s Int
 
 type SerializedBoard a = Table (SerializedBoardCell a)
 
 printSerializedBoard :: SerializedBoard Int -> String
-printSerializedBoard =
-  fmap
-    ( fmap
-        (fst >>> \case Marked x -> printf "(%s)\t" (show x); Unmarked x -> printf "%s\t" (show x))
-        >>> toList
-        >>> join
-    )
-    >>> toList
-    >>> List.intersperse "\n"
-    >>> join
+printSerializedBoard = fmap
+  (fmap
+     (fst
+      >>> \case
+        Marked x   -> printf "(%s)\t" (show x)
+        Unmarked x -> printf "%s\t" (show x))
+   >>> toList
+   >>> join)
+  >>> toList
+  >>> List.intersperse "\n"
+  >>> join
 
 type SerializedBingoBoard = SerializedBoard Int
 
 serializeBoard :: Board s a -> ST s (SerializedBoard a)
 serializeBoard = tableMapM (\cell -> readSTRef cell <&> serializeCell)
 
-data BoardCell s a = BoardCell
-  { boardCell :: Cell a,
-    boardCellPos :: (Int, Int),
-    boardRef :: STRef s (Board s a)
-  }
+data BoardCell s a = BoardCell { boardCell :: Cell a
+                               , boardCellPos :: (Int, Int)
+                               , boardRef :: STRef s (Board s a)
+                               }
 
 type BingoBoardCell s = BoardCell s Int
 
