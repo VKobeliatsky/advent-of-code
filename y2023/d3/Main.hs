@@ -5,7 +5,7 @@
 
 module Main where
 
-import Common (RefMonad (..))
+import Common.RefMonad
 import Control.Arrow hiding (second)
 import Control.Monad
 import Control.Monad.ST (runST)

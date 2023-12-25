@@ -49,7 +49,7 @@ common test-deps
 library common
   import:          deps
   hs-source-dirs:  common
-  exposed-modules: Common
+  exposed-modules: Common, Common.RefMonad
 
 test-suite common-test
   import:         test-deps
