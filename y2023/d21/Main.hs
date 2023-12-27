@@ -18,12 +18,22 @@ import           Data.Functor
 import qualified Data.List as L
 import qualified Data.Vector as V
 import           Text.Parsec
+import qualified System.IO
+import           Control.Monad.IO.Class (MonadIO(..))
+import           Data.IORef (IORef)
+import           Control.Arrow
+import           Prelude hiding (log)
 
 targetSteps :: Int
 targetSteps = 64
 
 isTargetEven :: Bool
 isTargetEven = even targetSteps
+
+startCount :: Int
+startCount = if isTargetEven
+             then 1
+             else 0
 
 shouldMark :: (Integral a) => a -> Bool
 shouldMark n = if isTargetEven
@@ -35,50 +45,13 @@ main = do
   input <- readFile "y2023/d21/input.data"
   (inputTable, inputUnvisisted) <- runParserT parseInputTable (0, 0) "" input
     <&> either (error . show) id
-  tilesCount <- newRef
-    $ if isTargetEven
-      then 1
-      else 0
-  let state = TaskState inputTable inputUnvisisted tilesCount
-  runReaderT (mapM processStep [1 .. targetSteps]) state
-  -- tableView <- serialize inputTable <&> tableRender renderTile
-  tilesCountView <- readRef tilesCount <&> show
-  putStrLn
-    $ L.intercalate
-      "\n"
-      [ "Task 1:"
-      , show targetSteps
-        -- tableView,
-      , tilesCountView]
+  state <- newRef startCount <&> TaskState inputTable inputUnvisisted
+  runReaderT (mapM processStep [1 .. targetSteps]) (Env state System.IO.stdout)
+  tilesCountView <- readRef (tilesCount state) <&> show
+  putStrLn tilesCountView
 
-type StackM s m = (RefMonad m, MonadReader s m)
-
-update :: (StackM s m) => (s -> Ref m a) -> (a -> a) -> m a
-update select updater = asks select >>= (`updateRef` updater)
-
-processStep :: (StackM (TaskState (Ref m)) m) => Int -> m ()
-processStep n =
-  let mark = shouldMark n
-  in asks unvisisted
-     >>= readRef
-     >>= mapM_
-       (\ref -> do
-          coords <- readRef ref <&> getCoords
-          inputTable <- asks table
-          selectNeighbors coords inputTable
-            `forM_` (\neighborRef -> do
-                       tile <- readRef neighborRef
-                       let neighborCoords = getCoords tile
-                       let isRock = isRockTile tile
-                       let isVisited = isVisitedTile tile
-                       when (not isRock && not isVisited)
-                         $ do
-                           when mark $ void incCount
-                           updateRef neighborRef
-                             $ const
-                             $ Visited neighborCoords n mark
-                           update unvisisted $ (:) neighborRef
-                           pure ()))
+data Env =
+  Env { taskState :: TaskState IORef, loggerHandle :: System.IO.Handle }
 
 type InputTable ref = Table (ref Tile)
 
@@ -97,13 +70,82 @@ data Tile =
   | Visited { getCoords :: TableCoords, getScore :: Int, isResult :: Bool }
   deriving (Eq, Show)
 
-incCount :: (StackM (TaskState (Ref m)) m) => m Int
-incCount = update tilesCount (+ 1)
+class HasTaskState a ref where
+  getTaskState :: a -> TaskState ref
+
+instance HasTaskState Env IORef where
+  getTaskState = taskState
+
+class HasLoggerHandle a where
+  getLoggerHandle :: a -> System.IO.Handle
+
+instance HasLoggerHandle Env where
+  getLoggerHandle = loggerHandle
+
+class Monad m => MonadLogger m where
+  log :: String -> m ()
+
+instance (HasLoggerHandle env, MonadIO m) => MonadLogger (ReaderT env m) where
+  log s = do
+    handle <- asks getLoggerHandle
+    liftIO
+      $ do
+        System.IO.hPutStr handle s
+        System.IO.hFlush handle
+
+type StackM s m = ( RefMonad m
+                  , HasTaskState s (Ref m)
+                  , HasLoggerHandle s
+                  , MonadLogger m
+                  , MonadReader s m)
+
+update :: (StackM s m) => (s -> Ref m a) -> (a -> a) -> m a
+update select updater = asks select >>= (`updateRef` updater)
+
+processStep :: (MonadIO m, StackM s m) => Int -> m ()
+processStep n =
+  let isFinalStep = if isTargetEven
+                    then even n
+                    else odd n
+      progressMessage = L.concat
+        [ "Checking step: "
+        , show n
+        , "/"
+        , show targetSteps
+        , if n == targetSteps
+          then "\n"
+          else "\r"]
+  in do
+       log progressMessage
+       asks (getTaskState >>> unvisisted)
+         >>= readRef
+         >>= mapM_
+           (\ref -> do
+              coords <- readRef ref <&> getCoords
+              inputTable <- asks (getTaskState >>> table)
+              selectNeighbors coords inputTable
+                `forM_` (\neighborRef -> do
+                           tile <- readRef neighborRef
+                           let neighborCoords = getCoords tile
+                           let isRock = isRockTile tile
+                           let isVisited = isVisitedTile tile
+                           when (not isRock && not isVisited)
+                             $ do
+                               when isFinalStep $ void incCount
+                               updateRef neighborRef
+                                 $ const
+                                 $ Visited neighborCoords n isFinalStep
+                               update (getTaskState >>> unvisisted)
+                                 $ (:) neighborRef
+                               pure ()))
+
+incCount :: (StackM s m) => m Int
+incCount = update (getTaskState >>> tilesCount) (+ 1)
 
 renderTile :: Tile -> String
 renderTile (Visited _ n marked)
   | n == 0 = " S "
-  | otherwise = let view = show n
+  | otherwise = let view = "O"
                 in L.concat
                    $ if marked
                      then ["(", view, ")"]
