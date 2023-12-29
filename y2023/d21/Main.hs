@@ -23,7 +23,7 @@ import           Model
 import           Parsers
 
 targetSteps :: Int
-targetSteps = 500
+targetSteps = 5000
 
 isTargetEven :: Bool
 isTargetEven = even targetSteps
@@ -88,31 +88,34 @@ processStep n =
   let marked = if isTargetEven
                then even n
                else odd n
-      progressMessage = L.concat
-        [ "Checking step: "
-        , show n
-        , "/"
-        , show targetSteps
-        , if n == targetSteps
-          then "\n"
-          else "\r"]
+      progressMessage =
+        L.concat ["Checking step: ", show n, "/", show targetSteps]
   in do
-       log progressMessage
-       asks (getTaskState >>> lastVisited)
-         >>= readRef
-         >>= mapM_
-           (\coords -> do
-              inputTable <- asks (getTaskState >>> table)
-              getTileNeighborCoords coords inputTable
-                `forM_` (\neighborCoords -> do
-                           neighborRef <- getTile neighborCoords inputTable
-                           tile <- readRef neighborRef
-                           let isRock = isRockTile tile
-                           let isVisited = isVisitedTile tile
-                           when (not isRock && not isVisited)
-                             $ do
-                               when marked $ void incCount
-                               updateRef neighborRef $ const $ Visited n marked
-                               update (getTaskState >>> lastVisited)
-                                 $ (:) neighborCoords
-                               pure ()))
+       tilesToCheck <- asks (getTaskState >>> lastVisited) >>= readRef
+       update (getTaskState >>> lastVisited) $ const []
+       log
+         $ progressMessage
+         ++ " "
+         ++ show (L.length tilesToCheck)
+         ++ if n == targetSteps
+            then "\n"
+            else "\r"
+       tilesToCheck
+         `forM_` (\coords -> do
+                    inputTable <- asks (getTaskState >>> table)
+                    getTileNeighborCoords coords inputTable
+                      `forM_` (\neighborCoords -> do
+                                 neighborRef
+                                   <- getTile neighborCoords inputTable
+                                 tile <- readRef neighborRef
+                                 let isRock = isRockTile tile
+                                 let isVisited = isVisitedTile tile
+                                 when (not isRock && not isVisited)
+                                   $ do
+                                     when marked $ void incCount
+                                     updateRef neighborRef
+                                       $ const
+                                       $ Visited n marked
+                                     update (getTaskState >>> lastVisited)
+                                       $ (:) neighborCoords
+                                     pure ()))
