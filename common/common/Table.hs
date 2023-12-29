@@ -28,6 +28,12 @@ type TableCoords = (Int, Int)
 selectElements :: Table a -> [a]
 selectElements = tableFoldl' (|>) Seq.empty >>> toList
 
+selectElement :: (Int, Int) -> Vector (Vector b) -> Maybe b
+selectElement (i, j) table = table !? i >>= (!? j)
+
+getNeighborCoords :: TableCoords -> [TableCoords]
+getNeighborCoords (i, j) = [(i - 1, j), (i, j + 1), (i + 1, j), (i, j - 1)]
+
 selectNeighbors :: (Int, Int) -> Table a -> [a]
 selectNeighbors (i, j) table = do
   let t = maybeToList (table !? (i - 1) >>= (!? j))

@@ -129,6 +129,8 @@ executable y2023-d21
   import:         deps
   hs-source-dirs: y2023/d21
   main-is:        Main.hs
+  other-modules:  Parsers
+                , Model
   build-depends:  common
 
 executable y2023-d25
