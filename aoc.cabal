@@ -125,6 +125,12 @@ executable y2023-d3
   main-is:        Main.hs
   build-depends:  common
 
+executable y2023-d4
+  import:         deps
+  hs-source-dirs: y2023/d4
+  main-is:        Main.hs
+  build-depends:  common
+
 executable y2023-d21
   import:         deps
   hs-source-dirs: y2023/d21

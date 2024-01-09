@@ -11,7 +11,6 @@ import           Data.Vector ((!?), (!))
 import qualified Data.Vector as V
 import           Data.Functor
 import qualified Data.Bifunctor as BF
-import           Control.Monad
 import           Data.Maybe (fromMaybe)
 
 type InputTable ref = Table (ref Tile)
