@@ -144,3 +144,12 @@ executable y2023-d25
   hs-source-dirs: y2023/d25
   main-is:        Main.hs
   build-depends:  common
+
+library y2024-d1
+  hs-source-dirs: y2024/d1
+  default-language: GHC2021
+  exposed-modules:
+    D1
+  build-depends:  base
+                , parsec
+                , containers
