@@ -153,3 +153,11 @@ library y2024-d1
   build-depends:  base
                 , parsec
                 , containers
+
+library y2024-d2
+  hs-source-dirs: y2024/d2
+  default-language: GHC2021
+  exposed-modules:
+    D2
+  build-depends:  base
+                , parsec
