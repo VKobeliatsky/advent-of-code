@@ -145,6 +145,14 @@ executable y2023-d25
   main-is:        Main.hs
   build-depends:  common
 
+library y2024-common
+  hs-source-dirs: y2024/common
+  default-language: GHC2021
+  exposed-modules:  AoC.Common
+                  , AoC.Data.Table
+  build-depends:  base
+                , containers
+                , vector
 library y2024-d1
   hs-source-dirs: y2024/d1
   default-language: GHC2021
@@ -169,3 +177,14 @@ library y2024-d3
     D3
   build-depends:  base
                 , parsec
+
+library y2024-d4
+  hs-source-dirs: y2024/d4
+  default-language: GHC2021
+  exposed-modules:  D4
+                  , Parser
+                  , Model
+  build-depends:  base
+                , parsec
+                , vector
+                , y2024-common
